@@ -1,6 +1,6 @@
 <?php
 
-class FreshExtension_heatmap_Controller extends Minz_ActionController {
+class FreshExtension_Heatmap_Controller extends Minz_ActionController {
 	
 	public function firstAction() {
 		// Ensure only logged in users can access this API
@@ -11,7 +11,9 @@ class FreshExtension_heatmap_Controller extends Minz_ActionController {
 	}
 
 	public function scoreAction() {
-		Minz_View::appendStyle('display: none;'); // We are returning JSON
+		$this->view->_layout(false);
+		header('Content-Type: application/json');
+		
 		$url = Minz_Request::param('url', '');
 		
 		if (empty($url)) {
@@ -24,7 +26,8 @@ class FreshExtension_heatmap_Controller extends Minz_ActionController {
 		// TODO: Query Reddit API
 		// TODO: Query SearXNG API
 		
-		$score = rand(0, 5000); // Dummy score for testing
+		// For the UI testing PR, return a random score
+		$score = rand(0, 3000); 
 		
 		echo json_encode([
 			'url' => $url,
