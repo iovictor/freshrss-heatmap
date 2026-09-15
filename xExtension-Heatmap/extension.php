@@ -3,12 +3,10 @@
 class HeatmapExtension extends Minz_Extension {
 	
 	public function init() {
-		// Register hooks for UI injection
+		// Register hook for UI injection
 		Minz_Extension::registerHook('entry_before_display', [$this, 'injectHeatmapUI']);
 		
-		// TODO: Register hook for the list view
-		
-		// Ensure JS is loaded
+		// Ensure JS and CSS are loaded
 		Minz_View::appendScript($this->getFileUrl('heatmap.js', 'js'));
 		Minz_View::appendStyle($this->getFileUrl('heatmap.css', 'css'));
 	}
@@ -18,15 +16,13 @@ class HeatmapExtension extends Minz_Extension {
 	}
 
 	public function injectHeatmapUI($entry) {
-		// Inject a placeholder badge into the entry content.
-		// The JS will pick this up, read the data-url, and fetch the score.
 		$url = $entry->link();
 		$id = $entry->id();
 		
-		$badge = '<div class="heatmap-badge" data-url="' . htmlspecialchars($url) . '" data-id="' . $id . '">🌡️ Loading...</div>';
+		// Badge injected into the title (visible in list view) and content (visible in reading view)
+		$badge = '<span class="ext-heatmap-badge" data-url="' . htmlspecialchars($url) . '" data-id="' . $id . '">🌡️...</span> ';
 		
-		// Prepend the badge to the content
-		$entry->_content($badge . $entry->content());
+		$entry->_title($badge . $entry->title());
 		
 		return $entry;
 	}
