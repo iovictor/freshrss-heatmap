@@ -100,12 +100,19 @@ const sortFeedsByHeat = () => {
         return scoreB - scoreA;
     });
     
-    // Hide date dividers since we are sorting by score now
-    document.querySelectorAll('.day').forEach(el => el.style.display = 'none');
+    // Hide date and transition dividers to remove empty gaps at the top
+    document.querySelectorAll('.day, .transition').forEach(el => el.style.display = 'none');
+    
+    // Ensure we don't push items below the footer (Load More button)
+    const footer = parent.querySelector('.stream-footer');
     
     // Reorder DOM
     entries.forEach(entry => {
-        parent.appendChild(entry);
+        if (footer) {
+            parent.insertBefore(entry, footer);
+        } else {
+            parent.appendChild(entry);
+        }
     });
     
     const btn = document.getElementById('ext-heatmap-sort-btn');
