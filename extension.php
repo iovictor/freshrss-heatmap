@@ -4,7 +4,7 @@ class HeatmapExtension extends Minz_Extension {
 	
 	public function init() {
 		// Log that init was called
-		error_log("Heatmap init called on request: " . $_SERVER['REQUEST_URI']);
+		error_log("Heatmap init called on request: " . $_SERVER['REQUEST_URI'] ?? 'CLI');
 
 		// Register hook for UI injection
 		Minz_Extension::registerHook('entry_before_display', [$this, 'injectHeatmapUI']);
