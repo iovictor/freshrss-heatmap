@@ -1,33 +1,53 @@
 # FreshRSS Heatmap Extension 🔥
 
-A native FreshRSS extension that calculates a "heat" and "credibility" score for RSS articles. Instead of treating all RSS feed items equally, this extension cross-references URLs against HackerNews, Reddit, and a local SearXNG instance to determine how viral or credible an article is, giving you a visual heatmap of your feed!
+A native extension for [FreshRSS](https://freshrss.org/) that automatically calculates and displays a "temperature" for every article in your feeds, helping you cut through the noise by highlighting articles that are highly upvoted or frequently shared across the web.
 
-## Features
+## Inspiration
+This extension takes heavy inspiration from the legendary **[Fever](https://shauninman.com/archive/2013/12/30/fever_1_18)** RSS reader app created by Shaun Inman. Fever pioneered the concept of tracking links across feeds to calculate a "temperature" for news items, allowing readers to instantly see what the web was talking about. We've ported and modernized those original heat mathematical formulas for FreshRSS!
 
-- **Asynchronous Scoring:** Uses the `entry_before_display` hook to inject lightweight JS into your feed. The heavy lifting (API calls) is done asynchronously so your feed loads instantly.
-- **Visual Heatmap:** Easily spot viral or highly-rated articles with dynamic UI emojis in both the post list and the reading view.
-  - ❄️ **Cold** (< 50 points)
-  - 😐 **Warm** (50 - 500 points)
-  - 🔥 **Hot** (500 - 2000 points)
-  - 🌋 **Viral** (2000+ points)
-- **Credibility Engine:** 
-  - HackerNews (Algolia) upvotes/comments integration.
-  - Reddit cross-post and upvote integration.
-  - SearXNG web-mention aggregation with domain-based credibility multipliers.
-- **SQLite Caching:** Scores are cached locally for 24 hours to prevent hitting external API rate limits.
+## How it works
+
+Every article starts at a healthy baseline temperature of **98.6°F**.
+
+When the extension loads an article, it checks three different sources to see if people are talking about it:
+1. **Hacker News:** (via Algolia's open API)
+2. **Reddit:** (via Reddit's public API)
+3. **SearXNG:** (via a local SearXNG instance)
+
+For every mention or upvote, the temperature rises. To prevent a single source (like one subreddit) from artificially inflating the score, the extension uses a **diminishing returns** formula (`Score / 2^n`). This means broad consensus across *different* subreddits or domains creates a much hotter article than one that is simply spammed in a single community.
+
+### UI Indicators
+The temperature is injected directly into your feed list and article view:
+- 😊 **Normal** (98.6°F)
+- 🤒 **Warm** (> 98.6°F)
+- 🔥 **Hot** (> 101.0°F)
+- 🌋 **Viral** (104.0°F+)
+- 🛑 **Frozen** (Article is older than 16 days and no longer auto-updates)
+
+You can also click the floating **🔥 Sort by Heat** button to instantly reorder your current view by temperature, or **click directly on any temperature badge** to force a manual refresh!
 
 ## Installation
 
-1. Clone this repository or download the `xExtension-Heatmap` folder.
-2. Place the `xExtension-Heatmap` folder into your FreshRSS extensions directory (usually `./data/www/FreshRSS/extensions/` or `./extensions/`).
-3. Log into your FreshRSS dashboard, navigate to **Extensions**, and enable the **Heatmap** extension.
+1. Copy this folder into your FreshRSS `extensions` directory:
+   `.../freshrss/extensions/xExtension-Heatmap/`
+2. Log into your FreshRSS account.
+3. Go to **Configuration** > **Extensions**.
+4. Enable the **Heatmap** extension.
+5. *(Optional)* Edit the `credibility_multipliers.json` file to adjust domain weightings for the SearXNG integration.
 
-## Development / Agentic Workflow
+## Intelligent Caching Schedule
 
-This repository is designed with autonomous AI agents in mind. Please refer to:
-- `agents.md` for subagent responsibilities and strict constraints (e.g., non-blocking UI rules).
-- `goal.md` for the overarching project architecture and success criteria.
+To prevent spamming external APIs and getting rate-limited, the extension uses an intelligent SQLite cache (`heatmap_cache.sqlite`) that dynamically adjusts how often an article's temperature is checked:
+- **Phase 1 (Active):** For the first 5 days (if the article is less than 7 days old), the temperature is refreshed every **24 hours**.
+- **Phase 2 (Cooling):** After 5 days, it slows down and checks only every **48 hours**.
+- **Phase 3 (Frozen):** After 16 days, the extension stops checking automatically (the score is frozen). You can still force an update by clicking the badge.
+- **Garbage Collection:** A background process routinely cleans up data older than 60 days to keep the database lean as old posts fall out of your feeds.
 
-## License
+## Configuration & Fallbacks
 
-MIT License
+- **SearXNG:** By default, the extension looks for a SearXNG instance at `http://192.168.1.29:8080`. If you don't have one, or if the connection fails, the extension will **gracefully degrade** and simply ignore SearXNG scores without breaking the UI. To change the SearXNG URL, edit `Controllers/heatmapController.php`.
+- **API Keys:** No API keys are required out of the box! We rely on public unauthenticated endpoints. If you hit rate limits with Reddit, you may need to implement authenticated requests in the PHP controller.
+
+## Contributing
+
+Feel free to open PRs to add more data sources (Mastodon, GitHub, etc.) or improve the sorting UI!
