@@ -30,28 +30,37 @@ class FreshExtension_heatmap_Controller extends Minz_ActionController {
 		$this->db->exec("CREATE TABLE IF NOT EXISTS cache (
 			url TEXT PRIMARY KEY,
 			score REAL,
-			timestamp INTEGER
+			timestamp INTEGER,
+			first_check INTEGER
 		)");
-	}
-
-	private function getCache($url) {
-		$stmt = $this->db->prepare("SELECT score, timestamp FROM cache WHERE url = :url");
-		$stmt->execute([':url' => $url]);
-		$result = $stmt->fetch(PDO::FETCH_ASSOC);
 		
-		if ($result && time() - $result['timestamp'] < 86400) {
-			return floatval($result['score']);
+		// Migration for existing users (ignore exception if column already exists)
+		try {
+			$this->db->exec("ALTER TABLE cache ADD COLUMN first_check INTEGER");
+			$this->db->exec("UPDATE cache SET first_check = timestamp WHERE first_check IS NULL");
+		} catch (PDOException $e) {}
+
+		// Garbage Collection: 1% chance to delete cached items that haven't been checked in 60 days
+		// This keeps the DB lean as old posts are naturally trashed by FreshRSS
+		if (rand(1, 100) === 1) {
+			$this->db->exec("DELETE FROM cache WHERE timestamp < " . (time() - 86400 * 60));
 		}
-		return false;
 	}
 
-	private function setCache($url, $score) {
-		$stmt = $this->db->prepare("INSERT INTO cache (url, score, timestamp) VALUES (:url, :score, :timestamp)
+	private function getCacheEntry($url) {
+		$stmt = $this->db->prepare("SELECT score, timestamp, first_check FROM cache WHERE url = :url");
+		$stmt->execute([':url' => $url]);
+		return $stmt->fetch(PDO::FETCH_ASSOC);
+	}
+
+	private function setCache($url, $score, $firstCheck) {
+		$stmt = $this->db->prepare("INSERT INTO cache (url, score, timestamp, first_check) VALUES (:url, :score, :timestamp, :first_check)
 			ON CONFLICT(url) DO UPDATE SET score=excluded.score, timestamp=excluded.timestamp");
 		$stmt->execute([
 			':url' => $url,
 			':score' => $score,
-			':timestamp' => time()
+			':timestamp' => time(),
+			':first_check' => $firstCheck
 		]);
 	}
 
@@ -70,16 +79,48 @@ class FreshExtension_heatmap_Controller extends Minz_ActionController {
 		header('Content-Type: application/json');
 		
 		$url = Minz_Request::param('url', '');
+		$pubdate = intval(Minz_Request::param('pubdate', 0));
+		$force = Minz_Request::param('force', 0);
 		
 		if (empty($url)) {
 			echo json_encode(['error' => 'No URL provided']);
 			return;
 		}
 
-		// 1. Check Cache
-		$cachedScore = $this->getCache($url);
-		if ($cachedScore !== false) {
-			echo json_encode(['url' => $url, 'score' => round($cachedScore, 1), 'cached' => true]);
+		$cache = $this->getCacheEntry($url);
+		$now = time();
+		$needsRefresh = false;
+		$frozen = false;
+		$firstCheck = $now;
+
+		if (!$cache) {
+			$needsRefresh = true;
+		} else {
+			$firstCheck = $cache['first_check'] ?: $cache['timestamp'];
+			$lastCheck = $cache['timestamp'];
+			
+			$daysSinceFirst = ($now - $firstCheck) / 86400;
+			$daysSincePub = ($now - $pubdate) / 86400;
+			$hoursSinceLast = ($now - $lastCheck) / 3600;
+			
+			if ($force) {
+				$needsRefresh = true;
+			} elseif ($daysSinceFirst > 16) {
+				$frozen = true;
+				$needsRefresh = false;
+			} elseif ($daysSinceFirst <= 5 && $daysSincePub <= 7) {
+				if ($hoursSinceLast >= 24) {
+					$needsRefresh = true;
+				}
+			} else {
+				if ($hoursSinceLast >= 48) {
+					$needsRefresh = true;
+				}
+			}
+		}
+
+		if (!$needsRefresh && $cache) {
+			echo json_encode(['url' => $url, 'score' => round($cache['score'], 1), 'cached' => true, 'frozen' => $frozen]);
 			return;
 		}
 
@@ -143,12 +184,13 @@ class FreshExtension_heatmap_Controller extends Minz_ActionController {
 		$finalScore = round($degrees, 1);
 
 		// Save to cache
-		$this->setCache($url, $finalScore);
+		$this->setCache($url, $finalScore, $firstCheck);
 
 		echo json_encode([
 			'url' => $url,
 			'score' => $finalScore,
-			'cached' => false
+			'cached' => false,
+			'frozen' => $frozen
 		]);
 	}
 }

@@ -25,9 +25,10 @@ class HeatmapExtension extends Minz_Extension {
 	public function injectHeatmapUI($entry) {
 		$url = $entry->link();
 		$id = $entry->id();
+		$pubdate = $entry->date(true); // Raw timestamp
 		
 		// Badge injected into the title (visible in list view) and content (visible in reading view)
-		$badge = '<span class="ext-heatmap-badge" data-url="' . htmlspecialchars($url) . '" data-id="' . $id . '">🌡️...</span> ';
+		$badge = '<span class="ext-heatmap-badge" data-url="' . htmlspecialchars($url) . '" data-id="' . $id . '" data-pubdate="' . $pubdate . '" title="Click to refresh score">🌡️...</span> ';
 		
 		$entry->_title($badge . $entry->title());
 		

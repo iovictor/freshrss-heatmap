@@ -1,24 +1,28 @@
-const processBadge = (badge) => {
-    if (badge.dataset.loaded) return;
-    
+const processBadge = (badge, force = false) => {
+    if (badge.dataset.loaded && !force) return;
     badge.dataset.loaded = 'true';
     
     const url = badge.dataset.url;
+    const pubdate = badge.dataset.pubdate || 0;
+    
     if (!url) {
         badge.innerText = '🌡️ No URL';
         return;
     }
 
-    badge.innerText = '🌡️ Fetching...';
+    badge.innerText = force ? '🌡️ Refetching...' : '🌡️ Fetching...';
 
-    fetch(`?c=heatmap&a=score&url=${encodeURIComponent(url)}`)
+    let fetchUrl = `?c=heatmap&a=score&url=${encodeURIComponent(url)}&pubdate=${pubdate}`;
+    if (force) fetchUrl += '&force=1';
+
+    fetch(fetchUrl)
         .then(response => {
             if (!response.ok) throw new Error("HTTP " + response.status);
             return response.json();
         })
         .then(data => {
             if (data && data.score !== undefined) {
-                updateBadgeUI(badge, data.score);
+                updateBadgeUI(badge, data.score, data.frozen);
             } else {
                 badge.innerText = '🌡️ Err Data';
             }
@@ -29,7 +33,7 @@ const processBadge = (badge) => {
         });
 };
 
-const updateBadgeUI = (badge, score) => {
+const updateBadgeUI = (badge, score, frozen) => {
     let emoji = '❄️';
     let className = 'ext-heatmap-cold';
     
@@ -47,13 +51,27 @@ const updateBadgeUI = (badge, score) => {
     }
 
     badge.className = `ext-heatmap-badge ${className}`;
-    badge.innerText = `${emoji} ${score.toFixed(1)}°F`;
+    
+    // Add visual indicator if the score is frozen
+    let text = `${emoji} ${score.toFixed(1)}°F`;
+    if (frozen) {
+        text += ' 🛑'; // Indicates it's no longer automatically updating
+    }
+    
+    badge.innerText = text;
 };
 
 const initBadges = () => {
     const elements = document.querySelectorAll('.ext-heatmap-badge:not([data-loaded="true"])');
     if (elements.length > 0) {
-        elements.forEach(processBadge);
+        elements.forEach(badge => {
+            badge.onclick = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                processBadge(badge, true);
+            };
+            processBadge(badge);
+        });
     }
 };
 
