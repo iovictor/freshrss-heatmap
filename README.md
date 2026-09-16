@@ -28,8 +28,9 @@ You can also click the floating **🔥 Sort by Heat** button to instantly reorde
 
 ## Installation
 
-1. Copy this folder into your FreshRSS `extensions` directory:
-   `.../freshrss/extensions/xExtension-Heatmap/`
+1. Clone this repository into your FreshRSS `extensions` directory under the name `xExtension-Heatmap`:
+   `git clone https://github.com/iovictor/freshrss-heatmap.git xExtension-Heatmap`
+
 2. Log into your FreshRSS account.
 3. Go to **Configuration** > **Extensions**.
 4. Enable the **Heatmap** extension.

@@ -1,0 +1,4 @@
+fever-main/
+test_perf.php
+.DS_Store
+heatmap_cache.sqlite
